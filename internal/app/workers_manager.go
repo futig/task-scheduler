@@ -10,6 +10,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+//TODO: добавить обработку напоминаний
 func worker(ctx context.Context, bot *tgbotapi.BotAPI, workerID int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
