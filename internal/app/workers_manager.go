@@ -1,0 +1,74 @@
+package app
+
+import (
+	"context"
+	"log"
+	"sync"
+	"time"
+
+	"github.com/futig/task-scheduler/internal/service"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+)
+
+func worker(ctx context.Context, bot *tgbotapi.BotAPI, workerID int, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	log.Printf("[Worker #%d] запущен\n", workerID)
+
+	for {
+		select {
+		case update, ok := <-wCfg.UpdatesCh:
+			if !ok {
+				log.Printf("[Worker #%d] завершение (канал закрыт)\n", workerID)
+				return
+			}
+
+			service.ProcessUpdate(bot, update, workerID)
+
+		case <-wCfg.StopWorkerCh:
+			log.Printf("[Worker #%d] завершение (stopWorkerCh)\n", workerID)
+			return
+		case <-ctx.Done():
+			log.Printf("[Worker #%d] завершение (stop signal)\n", workerID)
+			return
+		default:
+			continue
+		}
+	}
+}
+
+func workersManager(ctx context.Context, bot *tgbotapi.BotAPI, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	currentWorkers := cfg.MinWorkers
+	timerCh := time.After(cfg.WorkersCheckInterval)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timerCh:
+			time.Sleep(2 * time.Second)
+
+			wCfg.Mu.Lock()
+			queueLen := len(wCfg.UpdatesCh) + len(wCfg.RemindsCh)
+
+			if queueLen >= cfg.ScaleUpThreshold && currentWorkers < cfg.MaxWorkers {
+				newWorkerCount := currentWorkers + 1
+				wg.Add(1)
+				go worker(ctx, bot, newWorkerCount, wg)
+				currentWorkers = newWorkerCount
+			}
+
+			if queueLen <= cfg.ScaleDownThreshold && currentWorkers > cfg.MinWorkers {
+				wCfg.StopWorkerCh <- struct{}{}
+				currentWorkers--
+			}
+
+			wCfg.Mu.Unlock()
+			timerCh = time.After(cfg.WorkersCheckInterval)
+		default:
+			continue
+		}
+	}
+}

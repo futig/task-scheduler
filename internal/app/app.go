@@ -1,19 +1,22 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
-	config "github.com/futig/task-scheduler/internal/config"
-	service "github.com/futig/task-scheduler/internal/service"
+	"github.com/futig/task-scheduler/internal/config"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 var (
-	cfg          = config.NewAppConfig()
-	tasksCh      = make(chan tgbotapi.Update, cfg.QueueSize)
-	stopWorkerCh = make(chan struct{})
+	cfg  = config.NewAppConfig()
+	wCfg = config.NewWorkflowConfig()
 )
 
 func Run(token string) {
@@ -30,28 +33,36 @@ func Run(token string) {
 	updateConfig.Timeout = 30
 	updates := bot.GetUpdatesChan(updateConfig)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	var wg sync.WaitGroup
+
 	for i := 1; i <= cfg.MinWorkers; i++ {
-		go service.Worker(bot, i, tasksCh, stopWorkerCh)
+		wg.Add(1)
+		go worker(ctx, bot, i, &wg)
 	}
 
-	go service.WorkersManager(bot, tasksCh, stopWorkerCh, cfg)
+	wg.Add(1)
+	go workersManager(ctx, bot, &wg)
 
-	log.Printf("Бот: %s запущен с %d воркерами (мин=%d, макс=%d)",
-		bot.Self.UserName, cfg.MinWorkers, cfg.MinWorkers, cfg.MaxWorkers)
+	wg.Add(1)
+	go reminderManager(ctx, bot, &wg)
 
-	for update := range updates {
-		if update.Message != nil {
-			chatID := update.Message.Chat.ID
+	wg.Add(1)
+	go updatesManager(ctx, updates, bot, &wg)
 
-			queueLen := len(tasksCh)
-			if queueLen > cfg.BusyThreshold {
-				interimMsg := tgbotapi.NewMessage(chatID, "Запрос обрабатывается. Пожалуйста, подождите результата.")
-				bot.Send(interimMsg)
-			}
-			tasksCh <- update
-		}
-	}
+	log.Printf("Бот запущен")
 
-	close(tasksCh)
-	close(stopWorkerCh)
+	<-sigChan
+	log.Println("Получен сигнал завершения, останавливаем бота...")
+
+	cancel()
+
+	wg.Wait()
+	wCfg.CloseCh()
+
+	log.Println("Бот остановлен")
 }
