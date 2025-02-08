@@ -1,10 +1,15 @@
 package service
 
-func processUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, workerID int) {
-    if update.Message == nil {
-        return
-    }
+import (
+	"fmt"
+	"log"
+	"time"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+)
+
+
+func ProcessUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, workerID int) error {
     chatID := update.Message.Chat.ID
     text := update.Message.Text
 
@@ -17,4 +22,5 @@ func processUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, workerID int) {
     if err != nil {
         log.Printf("[Worker #%d] ошибка отправки ответа: %v", workerID, err)
     }
+    return nil
 }
