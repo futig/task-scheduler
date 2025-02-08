@@ -15,13 +15,13 @@ type TaskStorage interface {
 	UpdateTaskById(id string) error
 	DeleteTaskById(id string) error
 	DeleteTasksByDay(day domain.DayOfTheWeek, user string) error
-} 
+}
 
-type TimingStorage interface {
-	CreateTiming(timing domain.Timing) error
-	CreateTimings(timing []domain.Timing) error
+type RemindsStorage interface {
+	CreateTiming(timing domain.Remind) error
+	CreateTimings(timing []domain.Remind) error
 	GetTimingById(id string) (domain.Task, error)
 	GetTimingsWithOffset(offset int, timeMax time.Time) ([]domain.Task, error)
 	DeleteTimingById(id string) error
 	DeleteTimingsByTaskId(id string) error
-} 
+}
