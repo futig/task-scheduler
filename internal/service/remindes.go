@@ -1,10 +1,12 @@
 package service
 
 import (
+	"time"
+
+	"github.com/futig/task-scheduler/internal/domain"
 	"github.com/futig/task-scheduler/internal/storage"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func CheckAndSendReminders(storage storage.Storage, bot *tgbotapi.BotAPI) error {
-	return nil
+func GetRemindsForPastPeriod(storage storage.Storage, period time.Duration) ([]domain.TaskRemind, error) {
+	return nil, nil
 }

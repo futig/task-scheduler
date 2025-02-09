@@ -2,15 +2,14 @@ package app
 
 import (
 	"context"
+	"log"
 	"sync"
 	"time"
 
 	"github.com/futig/task-scheduler/internal/service"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func reminderManager(ctx context.Context, bot *tgbotapi.BotAPI, wg *sync.WaitGroup) {
+func reminderManager(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	timerCh := time.After(cfg.RemindsCheckInterval)
@@ -20,7 +19,14 @@ func reminderManager(ctx context.Context, bot *tgbotapi.BotAPI, wg *sync.WaitGro
 		case <-ctx.Done():
 			return
 		case <-timerCh:
-			service.CheckAndSendReminders(wCfg.Storage, bot)
+			tasks, err := service.GetRemindsForPastPeriod(wCfg.Storage, cfg.RemindsCheckInterval)
+			if err != nil {
+				log.Print(err.Error())
+				continue
+			}
+			for _, task := range tasks {
+				wCfg.RemindsCh <- task
+			}
 		default:
 			continue
 		}

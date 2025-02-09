@@ -3,18 +3,19 @@ package storage
 import (
 	"time"
 
-	domain "github.com/futig/task-scheduler/internal/domain"
+	"github.com/futig/task-scheduler/internal/domain"
+	"github.com/futig/task-scheduler/internal/domain/enums"
 )
 
 type TaskStorage interface {
 	CreateTask(task domain.Task) error
 	CreateTasks(tasks []domain.Task) error
 	GetTaskById(id string) (domain.Task, error)
-	GetTasksByDayAndUser(day domain.DayOfTheWeek, user string) ([]domain.Task, error)
+	GetTasksByDayAndUser(day enums.DayOfTheWeek, user string) ([]domain.Task, error)
 	GetCurrnetTask(user string) ([]domain.Task, error)
 	UpdateTaskById(id string) error
 	DeleteTaskById(id string) error
-	DeleteTasksByDay(day domain.DayOfTheWeek, user string) error
+	DeleteTasksByDay(day enums.DayOfTheWeek, user string) error
 }
 
 type RemindsStorage interface {

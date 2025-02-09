@@ -22,7 +22,7 @@ type AppConfig struct {
 	RemindsQueueSize     int
 	ScaleUpThreshold     int
 	ScaleDownThreshold   int
-	RemindsCheckInterval        time.Duration
+	RemindsCheckInterval time.Duration
 }
 
 func NewAppConfig() AppConfig {
@@ -35,12 +35,12 @@ func NewAppConfig() AppConfig {
 		RemindsQueueSize:     getIntVar("REMINDS_QUEUE_SIZE"),
 		ScaleUpThreshold:     getIntVar("SCALE_UP_THRESHOLD"),
 		ScaleDownThreshold:   getIntVar("SCALE_DOWN_THRESHOLD"),
-		RemindsCheckInterval:        time.Duration(getIntVar("CHECK_REMINDS_INTERVAL")) * time.Minute,
+		RemindsCheckInterval: time.Duration(getIntVar("CHECK_REMINDS_INTERVAL")) * time.Minute,
 	}
 }
 
 type WorkflowConfig struct {
-	RemindsCh    chan domain.Task
+	RemindsCh    chan domain.TaskRemind
 	UpdatesCh    chan tgbotapi.Update
 	StopWorkerCh chan struct{}
 	Mu           sync.Mutex
@@ -49,7 +49,7 @@ type WorkflowConfig struct {
 
 func NewWorkflowConfig() WorkflowConfig {
 	return WorkflowConfig{
-		RemindsCh:    make(chan domain.Task, getIntVar("REMINDS_QUEUE_SIZE")),
+		RemindsCh:    make(chan domain.TaskRemind, getIntVar("REMINDS_QUEUE_SIZE")),
 		UpdatesCh:    make(chan tgbotapi.Update, getIntVar("UPDATES_QUEUE_SIZE")),
 		StopWorkerCh: make(chan struct{}),
 	}

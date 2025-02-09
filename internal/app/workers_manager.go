@@ -6,11 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/futig/task-scheduler/internal/service"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-//TODO: добавить обработку напоминаний
 func worker(ctx context.Context, bot *tgbotapi.BotAPI, workerID int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -23,8 +21,14 @@ func worker(ctx context.Context, bot *tgbotapi.BotAPI, workerID int, wg *sync.Wa
 				log.Printf("[Worker #%d] завершение (канал закрыт)\n", workerID)
 				return
 			}
+			processUpdate(bot, update, workerID)
 
-			service.ProcessUpdate(bot, update, workerID)
+		case task, ok := <-wCfg.RemindsCh:
+			if !ok {
+				log.Printf("[Worker #%d] завершение (канал закрыт)\n", workerID)
+				return
+			}
+			processRemind(bot, task, workerID)
 
 		case <-wCfg.StopWorkerCh:
 			log.Printf("[Worker #%d] завершение (stopWorkerCh)\n", workerID)

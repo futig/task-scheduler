@@ -49,7 +49,7 @@ func Run(token string) {
 	go workersManager(ctx, bot, &wg)
 
 	wg.Add(1)
-	go reminderManager(ctx, bot, &wg)
+	go reminderManager(ctx, &wg)
 
 	wg.Add(1)
 	go updatesManager(ctx, updates, bot, &wg)
