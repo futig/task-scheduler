@@ -44,7 +44,7 @@ type WorkflowConfig struct {
 	UpdatesCh    chan tgbotapi.Update
 	StopWorkerCh chan struct{}
 	Mu           sync.Mutex
-	Storage      storage.Storage
+	Storage      storage.StorageContext
 }
 
 func NewWorkflowConfig() WorkflowConfig {

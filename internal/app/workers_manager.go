@@ -21,14 +21,14 @@ func worker(ctx context.Context, bot *tgbotapi.BotAPI, workerID int, wg *sync.Wa
 				log.Printf("[Worker #%d] завершение (канал закрыт)\n", workerID)
 				return
 			}
-			processUpdate(bot, update, workerID)
+			processUpdate(bot, update)
 
 		case task, ok := <-wCfg.RemindsCh:
 			if !ok {
 				log.Printf("[Worker #%d] завершение (канал закрыт)\n", workerID)
 				return
 			}
-			processRemind(bot, task, workerID)
+			processRemind(bot, task)
 
 		case <-wCfg.StopWorkerCh:
 			log.Printf("[Worker #%d] завершение (stopWorkerCh)\n", workerID)

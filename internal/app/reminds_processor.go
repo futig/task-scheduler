@@ -9,7 +9,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func processRemind(bot *tgbotapi.BotAPI, task domain.TaskRemind, workerId int) error {
+func processRemind(bot *tgbotapi.BotAPI, task domain.TaskRemind) error {
 	timeToTask := int(task.Start.Sub(time.Now()).Minutes())
 	var message string
 	if timeToTask == 0 {
