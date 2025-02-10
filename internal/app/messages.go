@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/futig/task-scheduler/pkg/e"
+	"github.com/futig/task-scheduler/pkg/error"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 

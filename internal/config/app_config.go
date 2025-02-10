@@ -10,6 +10,7 @@ import (
 
 	"github.com/futig/task-scheduler/internal/domain"
 	"github.com/futig/task-scheduler/internal/storage"
+	"github.com/futig/task-scheduler/internal/storage/temp_storage"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -44,7 +45,7 @@ type WorkflowConfig struct {
 	UpdatesCh    chan tgbotapi.Update
 	StopWorkerCh chan struct{}
 	Mu           sync.Mutex
-	Storage      storage.StorageContext
+	Storage      storage.Storage
 }
 
 func NewWorkflowConfig() WorkflowConfig {
@@ -52,6 +53,7 @@ func NewWorkflowConfig() WorkflowConfig {
 		RemindsCh:    make(chan domain.TaskRemind, getIntVar("REMINDS_QUEUE_SIZE")),
 		UpdatesCh:    make(chan tgbotapi.Update, getIntVar("UPDATES_QUEUE_SIZE")),
 		StopWorkerCh: make(chan struct{}),
+		Storage: &tempstorage.TempStorageContext{},
 	}
 }
 

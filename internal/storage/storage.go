@@ -8,6 +8,11 @@ import (
 	"github.com/google/uuid"
 )
 
+type Storage interface {
+	TaskStorage
+	RemindsStorage
+}
+
 type TaskStorage interface {
 	CreateTask(task domain.Task) error
 	CreateTasks(tasks []domain.Task) error

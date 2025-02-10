@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/futig/task-scheduler/internal/domain"
+	t "github.com/futig/task-scheduler/pkg/time"
 
 	"github.com/google/uuid"
 )
@@ -32,11 +33,11 @@ func (s *TempStorageContext) CreateTasks(tasks []domain.Task) error {
 	return nil
 }
 
-func (s *TempStorageContext) GetTaskById(id uuid.UUID) (domain.Task, error) {
+func (s *TempStorageContext) GetTaskById(id uuid.UUID) (domain.Task, bool, error) {
 	if val, ok := s.Tasks.Load(id); ok {
-		return val.(domain.Task), nil
+		return val.(domain.Task), ok, nil
 	}
-	return domain.Task{}, fmt.Errorf("задачи с таким id не существует: %s", id.String())
+	return domain.Task{}, false, fmt.Errorf("задачи с таким id не существует: %s", id.String())
 }
 
 func (s *TempStorageContext) GetTasksByDayAndUser(day time.Weekday, chatID int64) ([]domain.Task, error) {
@@ -50,17 +51,16 @@ func (s *TempStorageContext) GetTasksByDayAndUser(day time.Weekday, chatID int64
 	return result, nil
 }
 
-func (s *TempStorageContext) GetCurrnetTask(chatID int64) (domain.Task, error) {
+func (s *TempStorageContext) GetCurrnetTask(chatID int64) (domain.Task, bool, error) {
 	for _, value := range s.Tasks.Range {
 		task := value.(domain.Task)
 		day := time.Now().Weekday()
-		curTime := time.Now().Local()
-		totalMinutes := curTime.Hour()*60 + curTime.Minute()
-		if task.Day == day && task.ChatId == chatID && task.Start <= totalMinutes && task.End > totalMinutes {
-			return task, nil
+		curTime := t.CurrentTimeToMinutes()
+		if task.Day == day && task.ChatId == chatID && task.Start <= curTime && task.End > curTime {
+			return task, true, nil
 		}
 	}
-	return domain.Task{}, nil
+	return domain.Task{}, false, nil
 }
 
 func (s *TempStorageContext) UpdateTaskById(id uuid.UUID, task domain.Task) error {

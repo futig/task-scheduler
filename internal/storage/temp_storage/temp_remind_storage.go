@@ -2,9 +2,10 @@ package tempstorage
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/futig/task-scheduler/internal/domain"
+	t "github.com/futig/task-scheduler/pkg/time"
+
 	"github.com/google/uuid"
 )
 
@@ -48,9 +49,8 @@ func (s *TempStorageContext) GetRemindsForPeriod(period int) ([]domain.TaskRemin
 	result := make([]domain.TaskRemind, 100)
 	for _, remVal := range s.Reminds.Range {
 		remind := remVal.(domain.Remind)
-		curTime := time.Now().Local()
-		totalMinutes := curTime.Hour()*60 + curTime.Minute()
-		diff := remind.Time - totalMinutes
+		curTime := t.CurrentTimeToMinutes()
+		diff := remind.Time - curTime
 		if diff < 0 && period <= diff {
 			continue
 		}
