@@ -1,14 +1,13 @@
 package domain
 
 import (
-	"time"
-
 	"github.com/futig/task-scheduler/internal/domain/enums"
+	"github.com/google/uuid"
 )
 
 type Remind struct {
-	TimingId string
-	TaskId   string
-	Type     enums.RemindType
-	Time     time.Time
+	Id     uuid.UUID
+	TaskId uuid.UUID
+	Type   enums.RemindType
+	Time   int
 }

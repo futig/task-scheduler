@@ -3,14 +3,14 @@ package domain
 import (
 	"time"
 
-	"github.com/futig/task-scheduler/internal/domain/enums"
+	"github.com/google/uuid"
 )
 
 type Task struct {
-	TaskId  string
-	ChatId  string
-	Day     enums.DayOfTheWeek
-	Start   time.Time
-	End     time.Time
+	Id      uuid.UUID
+	ChatId  int64
+	Day     time.Weekday
+	Start   int // В минутах с начала дня
+	End     int // В минутах с начала дня
 	Comment string
 }
