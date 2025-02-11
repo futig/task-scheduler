@@ -36,8 +36,6 @@ func worker(ctx context.Context, bot *tgbotapi.BotAPI, workerID int, wg *sync.Wa
 		case <-ctx.Done():
 			log.Printf("[Worker #%d] завершение (stop signal)\n", workerID)
 			return
-		default:
-			continue
 		}
 	}
 }
@@ -72,8 +70,6 @@ func workersManager(ctx context.Context, bot *tgbotapi.BotAPI, wg *sync.WaitGrou
 
 			wCfg.Mu.Unlock()
 			timerCh = time.After(cfg.WorkersCheckInterval)
-		default:
-			continue
 		}
 	}
 }

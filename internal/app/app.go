@@ -32,7 +32,6 @@ func Run() {
 
 	updateConfig := tgbotapi.NewUpdate(0)
 	updateConfig.Timeout = 30
-	updateConfig.AllowedUpdates = []string{"message", "callback_query"} 
 	updates := bot.GetUpdatesChan(updateConfig)
 
 	ctx, cancel := context.WithCancel(context.Background())

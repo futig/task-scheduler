@@ -24,8 +24,6 @@ func updatesManager(ctx context.Context, updates tgbotapi.UpdatesChannel, bot *t
 		case <-ctx.Done():
 			wg.Done()
 			return
-		default:
-			continue
 		}
 	}
 }
