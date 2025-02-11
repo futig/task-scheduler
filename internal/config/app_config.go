@@ -36,7 +36,6 @@ func NewAppConfig() AppConfig {
 		MinWorkers:           getIntVar("MIN_WORKERS"),
 		MaxWorkers:           getIntVar("MAX_WORKERS"),
 		BusyThreshold:        getIntVar("BUSY_THRESHOLD"),
-		UpdatesQueueSize:     getIntVar("UPDATES_QUEUE_SIZE"),
 		RemindsQueueSize:     getIntVar("REMINDS_QUEUE_SIZE"),
 		ScaleUpThreshold:     getIntVar("SCALE_UP_THRESHOLD"),
 		ScaleDownThreshold:   getIntVar("SCALE_DOWN_THRESHOLD"),
@@ -47,7 +46,7 @@ func NewAppConfig() AppConfig {
 
 type WorkflowConfig struct {
 	RemindsCh    chan domain.TaskRemind
-	UpdatesCh    chan tgbotapi.Update
+	UpdatesCh    tgbotapi.UpdatesChannel
 	StopWorkerCh chan struct{}
 	Mu           sync.Mutex
 	Storage      storage.Storage
@@ -57,7 +56,6 @@ func NewWorkflowConfig() WorkflowConfig {
 	initEnvVariables()
 	return WorkflowConfig{
 		RemindsCh:    make(chan domain.TaskRemind, getIntVar("REMINDS_QUEUE_SIZE")),
-		UpdatesCh:    make(chan tgbotapi.Update, getIntVar("UPDATES_QUEUE_SIZE")),
 		StopWorkerCh: make(chan struct{}),
 		Storage:      &tempstorage.TempStorageContext{},
 	}
@@ -65,7 +63,6 @@ func NewWorkflowConfig() WorkflowConfig {
 
 func (w *WorkflowConfig) CloseCh() {
 	close(w.RemindsCh)
-	close(w.UpdatesCh)
 	close(w.StopWorkerCh)
 }
 

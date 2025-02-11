@@ -21,6 +21,20 @@ func worker(ctx context.Context, bot *tgbotapi.BotAPI, workerID int, wg *sync.Wa
 				log.Printf("[Worker #%d] завершение (канал закрыт)\n", workerID)
 				return
 			}
+			var chatID int64
+			if update.Message != nil {
+				chatID = update.Message.Chat.ID
+			} else if update.CallbackQuery != nil {
+				chatID = update.CallbackQuery.From.ID
+			} else {
+				continue
+			}
+
+			queueLen := len(wCfg.UpdatesCh) + len(wCfg.RemindsCh)
+			if queueLen > cfg.BusyThreshold {
+				_ = sendMessage(bot, chatID, "Запрос обрабатывается. Пожалуйста, подождите результата.")
+			}
+			
 			processUpdate(bot, update)
 
 		case task, ok := <-wCfg.RemindsCh:

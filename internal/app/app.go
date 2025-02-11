@@ -33,6 +33,7 @@ func Run() {
 	updateConfig := tgbotapi.NewUpdate(0)
 	updateConfig.Timeout = 30
 	updates := bot.GetUpdatesChan(updateConfig)
+	wCfg.UpdatesCh = updates
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -51,9 +52,6 @@ func Run() {
 
 	wg.Add(1)
 	go reminderManager(ctx, &wg)
-
-	wg.Add(1)
-	go updatesManager(ctx, updates, bot, &wg)
 
 	log.Printf("Бот запущен")
 
