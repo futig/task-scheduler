@@ -11,8 +11,12 @@ import (
 	"github.com/futig/task-scheduler/internal/domain"
 	"github.com/futig/task-scheduler/internal/storage"
 	"github.com/futig/task-scheduler/internal/storage/temp_storage"
+	"github.com/joho/godotenv"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+var variablesInited bool
 
 type AppConfig struct {
 	MinWorkers           int
@@ -27,16 +31,17 @@ type AppConfig struct {
 }
 
 func NewAppConfig() AppConfig {
+	initEnvVariables()
 	return AppConfig{
 		MinWorkers:           getIntVar("MIN_WORKERS"),
 		MaxWorkers:           getIntVar("MAX_WORKERS"),
-		WorkersCheckInterval: time.Duration(getIntVar("WORKERS_CHECK_INTERVAL")) * time.Second,
 		BusyThreshold:        getIntVar("BUSY_THRESHOLD"),
 		UpdatesQueueSize:     getIntVar("UPDATES_QUEUE_SIZE"),
 		RemindsQueueSize:     getIntVar("REMINDS_QUEUE_SIZE"),
 		ScaleUpThreshold:     getIntVar("SCALE_UP_THRESHOLD"),
 		ScaleDownThreshold:   getIntVar("SCALE_DOWN_THRESHOLD"),
 		RemindsCheckInterval: time.Duration(getIntVar("CHECK_REMINDS_INTERVAL")) * time.Minute,
+		WorkersCheckInterval: time.Duration(getIntVar("WORKERS_CHECK_INTERVAL")) * time.Second,
 	}
 }
 
@@ -49,11 +54,12 @@ type WorkflowConfig struct {
 }
 
 func NewWorkflowConfig() WorkflowConfig {
+	initEnvVariables()
 	return WorkflowConfig{
 		RemindsCh:    make(chan domain.TaskRemind, getIntVar("REMINDS_QUEUE_SIZE")),
 		UpdatesCh:    make(chan tgbotapi.Update, getIntVar("UPDATES_QUEUE_SIZE")),
 		StopWorkerCh: make(chan struct{}),
-		Storage: &tempstorage.TempStorageContext{},
+		Storage:      &tempstorage.TempStorageContext{},
 	}
 }
 
@@ -61,6 +67,16 @@ func (w *WorkflowConfig) CloseCh() {
 	close(w.RemindsCh)
 	close(w.UpdatesCh)
 	close(w.StopWorkerCh)
+}
+
+func initEnvVariables() {
+	if !variablesInited {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatal(".env file not found or can't be loaded")
+		}
+		variablesInited = true
+	}
 }
 
 func getIntVar(key string) int {

@@ -19,7 +19,8 @@ var (
 	wCfg = config.NewWorkflowConfig()
 )
 
-func Run(token string) {
+func Run() {
+	token := os.Getenv("BOT_TOKEN")
 	if token == "" {
 		log.Fatal("wrong token")
 	}
@@ -31,6 +32,7 @@ func Run(token string) {
 
 	updateConfig := tgbotapi.NewUpdate(0)
 	updateConfig.Timeout = 30
+	updateConfig.AllowedUpdates = []string{"message", "callback_query"} 
 	updates := bot.GetUpdatesChan(updateConfig)
 
 	ctx, cancel := context.WithCancel(context.Background())
