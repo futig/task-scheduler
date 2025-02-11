@@ -19,7 +19,7 @@ func reminderManager(ctx context.Context, wg *sync.WaitGroup) {
 		case <-ctx.Done():
 			return
 		case <-timerCh:
-			tasks, err := service.GetRemindsForPastPeriod(wCfg.Storage, cfg.RemindsCheckInterval)
+			tasks, err := service.GetRemindsForPeriod(wCfg.Storage, cfg.RemindsCheckInterval)
 			if err != nil {
 				log.Print(err.Error())
 				continue

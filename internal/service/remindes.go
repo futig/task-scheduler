@@ -7,6 +7,8 @@ import (
 	"github.com/futig/task-scheduler/internal/storage"
 )
 
-func GetRemindsForPastPeriod(storage storage.RemindsStorage, period time.Duration) ([]domain.TaskRemind, error) {
-	return nil, nil
+func GetRemindsForPeriod(storage storage.RemindsStorage, period time.Duration) ([]domain.TaskRemind, error) {
+	totalMinutes := int(period.Minutes())
+	reminds, err := storage.GetRemindsForPeriod(totalMinutes)
+	return reminds, err
 }
