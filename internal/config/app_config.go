@@ -10,6 +10,7 @@ import (
 
 	"github.com/futig/task-scheduler/internal/domain"
 	"github.com/futig/task-scheduler/internal/storage"
+	"github.com/futig/task-scheduler/internal/storage/temp_cache"
 	"github.com/futig/task-scheduler/internal/storage/temp_storage"
 	"github.com/joho/godotenv"
 
@@ -50,6 +51,7 @@ type WorkflowConfig struct {
 	StopWorkerCh chan struct{}
 	Mu           sync.Mutex
 	Storage      storage.Storage
+	Cache        storage.Cache
 }
 
 func NewWorkflowConfig() WorkflowConfig {
@@ -58,6 +60,7 @@ func NewWorkflowConfig() WorkflowConfig {
 		RemindsCh:    make(chan domain.TaskRemind, getIntVar("REMINDS_QUEUE_SIZE")),
 		StopWorkerCh: make(chan struct{}),
 		Storage:      &tempstorage.TempStorageContext{},
+		Cache:        &tempcache.TempCache{},
 	}
 }
 
