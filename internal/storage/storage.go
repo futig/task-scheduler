@@ -11,6 +11,7 @@ import (
 type Storage interface {
 	TaskStorage
 	RemindsStorage
+	UsersStorage
 }
 
 type TaskStorage interface {
@@ -31,4 +32,11 @@ type RemindsStorage interface {
 	GetRemindsForPeriod(period int) ([]domain.TaskRemind, error) // period в минутах на будущее
 	DeleteRemindById(id uuid.UUID) error
 	DeleteRemindsByTaskId(id uuid.UUID) error
+}
+
+type UsersStorage interface {
+	CreateUserState(user domain.User) error
+	GetUserState(chatId int64) (domain.User, bool, error)
+	UpdateUserState(chatId int64, user domain.User) error
+	DeleteUserState(chatId int64) error
 }

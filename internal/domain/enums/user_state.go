@@ -3,12 +3,24 @@ package enums
 type UserState int
 
 const (
-	MainMenu RemindType = iota
-	ChoosingDOWToGet
-	ChoosingDOWToUpdate
+	MainMenu UserState = iota
+	
+	ChooseWeekdayGet
+	ChooseWeekdayUpdate
+
 	UpdatingDaySchedule
-	UpdatingItem
-	UpdatingItemDescription
-	UpdatingItemTime
-	UpdatingItemReminds
+
+	UpdateTask
+	UpdateTaskDescription
+	UpdateTaskTime
+	UpdateTaskReminds
+
+	ShowCurrentSchedule
+	ShowCurrentTask
+	ShowOtherDaySchedule
+
+	DeleteSchedule
+	DeleteTask
+
+	TaskNotFound
 )
