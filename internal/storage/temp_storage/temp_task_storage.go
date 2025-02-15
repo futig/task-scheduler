@@ -2,6 +2,7 @@ package tempstorage
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -40,27 +41,61 @@ func (s *TempStorageContext) GetTaskById(id uuid.UUID) (domain.Task, bool, error
 	return domain.Task{}, false, fmt.Errorf("задачи с таким id не существует: %s", id.String())
 }
 
+func (s *TempStorageContext) GetTaskByPosition(pos int, day time.Weekday, chatID int64) (domain.Task, bool, error) {
+	result := make([]domain.Task, 100)
+	for _, value := range s.Tasks.Range {
+		task := value.(domain.Task)
+		if task.Weekday == day && task.ChatId == chatID {
+			result = append(result, task)
+		}
+	}
+
+	if len(result) <= pos {
+		return domain.Task{}, false, nil
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].End <= result[j].End
+	})
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Start <= result[j].Start
+	})
+
+	return result[pos], true, nil
+}
+
 func (s *TempStorageContext) GetTasksByDayAndUser(day time.Weekday, chatID int64) ([]domain.Task, error) {
 	result := make([]domain.Task, 100)
 	for _, value := range s.Tasks.Range {
 		task := value.(domain.Task)
-		if task.Day == day && task.ChatId == chatID {
+		if task.Weekday == day && task.ChatId == chatID {
 			result = append(result, task)
 		}
 	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].End <= result[j].End
+	})
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Start <= result[j].Start
+	})
+
 	return result, nil
 }
 
-func (s *TempStorageContext) GetCurrnetTask(chatID int64) (domain.Task, bool, error) {
+func (s *TempStorageContext) GetCurrnetTasks(chatID int64) ([]domain.Task, error) {
+	result := make([]domain.Task, 100)
 	for _, value := range s.Tasks.Range {
 		task := value.(domain.Task)
 		day := time.Now().Weekday()
 		curTime := t.CurrentTimeToMinutes()
-		if task.Day == day && task.ChatId == chatID && task.Start <= curTime && task.End > curTime {
-			return task, true, nil
+		if task.Weekday == day && task.ChatId == chatID && task.Start <= curTime && task.End > curTime {
+			result = append(result, task)
 		}
 	}
-	return domain.Task{}, false, nil
+	return result, nil
 }
 
 func (s *TempStorageContext) UpdateTaskById(id uuid.UUID, task domain.Task) error {
@@ -80,7 +115,7 @@ func (s *TempStorageContext) DeleteTasksByDay(day time.Weekday, chatID int64) er
 	for _, value := range s.Tasks.Range {
 		task := value.(domain.Task)
 		day := time.Now().Weekday()
-		if task.Day == day && task.ChatId == chatID {
+		if task.Weekday == day && task.ChatId == chatID {
 			s.Tasks.Delete(task.Id)
 		}
 	}

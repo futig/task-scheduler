@@ -18,8 +18,9 @@ type TaskStorage interface {
 	CreateTask(task domain.Task) error
 	CreateTasks(tasks []domain.Task) error
 	GetTaskById(id uuid.UUID) (domain.Task, bool, error)
+	GetTaskByPosition(pos int, day time.Weekday, chatID int64) (domain.Task, bool, error)
 	GetTasksByDayAndUser(day time.Weekday, chatID int64) ([]domain.Task, error)
-	GetCurrnetTask(chatID int64) (domain.Task, bool, error)
+	GetCurrnetTasks(chatID int64) ([]domain.Task, error)
 	UpdateTaskById(id uuid.UUID, task domain.Task) error
 	DeleteTaskById(id uuid.UUID) error
 	DeleteTasksByDay(day time.Weekday, chatID int64) error

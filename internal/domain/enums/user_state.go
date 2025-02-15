@@ -9,6 +9,7 @@ const (
 	ChooseWeekdayUpdate
 
 	UpdatingDaySchedule
+	UpdatedDaySchedule
 
 	UpdateTask
 	UpdateTaskDescription
