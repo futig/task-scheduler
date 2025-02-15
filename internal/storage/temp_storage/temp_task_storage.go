@@ -42,7 +42,7 @@ func (s *TempStorageContext) GetTaskById(id uuid.UUID) (domain.Task, bool, error
 }
 
 func (s *TempStorageContext) GetTaskByPosition(pos int, day time.Weekday, chatID int64) (domain.Task, bool, error) {
-	result := make([]domain.Task, 100)
+	result := make([]domain.Task, 0, 100)
 	for _, value := range s.Tasks.Range {
 		task := value.(domain.Task)
 		if task.Weekday == day && task.ChatId == chatID {
@@ -66,7 +66,7 @@ func (s *TempStorageContext) GetTaskByPosition(pos int, day time.Weekday, chatID
 }
 
 func (s *TempStorageContext) GetTasksByDayAndUser(day time.Weekday, chatID int64) ([]domain.Task, error) {
-	result := make([]domain.Task, 100)
+	result := make([]domain.Task, 0, 100)
 	for _, value := range s.Tasks.Range {
 		task := value.(domain.Task)
 		if task.Weekday == day && task.ChatId == chatID {
@@ -86,7 +86,7 @@ func (s *TempStorageContext) GetTasksByDayAndUser(day time.Weekday, chatID int64
 }
 
 func (s *TempStorageContext) GetCurrnetTasks(chatID int64) ([]domain.Task, error) {
-	result := make([]domain.Task, 100)
+	result := make([]domain.Task, 0, 100)
 	for _, value := range s.Tasks.Range {
 		task := value.(domain.Task)
 		day := time.Now().Weekday()

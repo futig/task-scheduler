@@ -24,7 +24,7 @@ func GetScheduleByWeekday(storage storage.Storage, chatID int64, weekday time.We
 	if err != nil {
 		return "", false, err
 	}
-	res := make([]string, len(tasks))
+	res := make([]string, 0, len(tasks))
 	for _, val := range tasks {
 		res = append(res, val.String())
 	}
@@ -37,7 +37,7 @@ func GetCurrentTasks(storage storage.Storage, chatID int64) (string, bool, error
 	if err != nil {
 		return "", false, err
 	}
-	res := make([]string, len(tasks))
+	res := make([]string, 0, len(tasks))
 	for _, val := range tasks {
 		res = append(res, val.String())
 	}
@@ -56,8 +56,8 @@ func GetTaskByPosition(storage storage.Storage, id int, chatID int64, weekday ti
 
 func CreateSchedule(storage storage.Storage, chatID int64, weekday time.Weekday, data string) error {
 	lines := strings.Split(data, "\n")
-	tasks := make([]domain.Task, len(lines))
-	reminders := make([]domain.Remind, len(lines))
+	tasks := make([]domain.Task, 0, len(lines))
+	reminders := make([]domain.Remind, 0, len(lines))
 
 	for _, line := range lines {
 		matches := taskRegex.FindStringSubmatch(line)

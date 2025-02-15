@@ -46,7 +46,7 @@ func (s *TempStorageContext) GetRemindById(id uuid.UUID) (domain.TaskRemind, boo
 }
 
 func (s *TempStorageContext) GetRemindsForPeriod(period int) ([]domain.TaskRemind, error) {
-	result := make([]domain.TaskRemind, 100)
+	result := make([]domain.TaskRemind, 0, 100)
 	for _, remVal := range s.Reminds.Range {
 		remind := remVal.(domain.Remind)
 		curTime := t.CurrentTimeToMinutes()
