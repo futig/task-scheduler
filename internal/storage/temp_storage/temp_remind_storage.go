@@ -75,11 +75,15 @@ func (s *TempStorageContext) DeleteRemindById(id uuid.UUID) error {
 }
 
 func (s *TempStorageContext) DeleteRemindsByTaskId(id uuid.UUID) error {
+	toDelete := []uuid.UUID{}
 	for _, value := range s.Reminds.Range {
-		task := value.(domain.Task)
+		task := value.(domain.Remind)
 		if task.Id == id {
-			s.Reminds.Delete(task.Id)
+			toDelete = append(toDelete, task.Id)
 		}
+	}
+	for _, rId := range toDelete {
+		s.Reminds.Delete(rId)
 	}
 	return nil
 }

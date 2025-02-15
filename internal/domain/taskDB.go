@@ -21,5 +21,5 @@ func (t *Task) String() string {
 	startM := t.Start % 60
 	endH := t.End / 60
 	endM := t.End % 60
-	return fmt.Sprintf("%d:%d-%d:%d ~ %s", startH, startM, endH, endM, t.Comment)
+	return fmt.Sprintf("%02d:%02d-%02d:%02d ~ %s", startH, startM, endH, endM, t.Comment)
 }

@@ -39,10 +39,26 @@ func processMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
 
 	if text == "/start" {
 		return sendWelcomeMessage(bot, chatID)
-	} else if regexp.MustCompile(`^[1-9]\d{0,3}`).MatchString(text) {
-		return showUpdateTask(bot, chatID, text, uuid.Nil)
-	} else {
-		return tryCreateSchedule(bot, chatID, text)
+	}
+
+	userState, ok, err := service.GetUserState(wCfg.Cache, wCfg.Storage, chatID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось получить состояние пользователя %d", chatID)
+	}
+
+	if userState.State == enums.UpdateDaySchedule && regexp.MustCompile(`^[1-9]\d{0,3}$`).MatchString(text) {
+		return showUpdateTask(bot, chatID, text, uuid.Nil, userState)
+	} else if userState.State == enums.UpdateDaySchedule {
+		return CreateSchedule(bot, chatID, text, userState)
+	} else if userState.State == enums.UpdateTaskDescription {
+		return UpdateTaskDescription(bot, chatID, text, userState)
+	} else if userState.State == enums.UpdateTaskTime {
+		return UpdateTaskTime(bot, chatID, text, userState)
+	} else if userState.State == enums.UpdateTaskReminds {
+		return UpdateTaskReminds(bot, chatID, text, userState)
 	}
 
 	return nil
@@ -73,7 +89,7 @@ func processCallbackQuery(bot *tgbotapi.BotAPI, query *tgbotapi.CallbackQuery) e
 		return showChangeSchedule(bot, chatID, query.Message.MessageID)
 
 	case regexp.MustCompile(`^action_day`).MatchString(data):
-		weekday := parseActionDay(data[11:])
+		weekday := parseActionDay(data)
 		return showDayAction(bot, chatID, query.Message.MessageID, weekday)
 
 	case data == "action_delete_schedule":
@@ -181,11 +197,7 @@ func sendWelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) (err error) {
 	defer e.WrapErrIfNotNil(err, "sendWelcomeMessage")
 
 	keyboard := mainMenuKeyboard()
-
-	msg := tgbotapi.NewMessage(chatID, "Выбери нужный пункт меню:")
-	msg.ReplyMarkup = keyboard
-
-	_, err = bot.Send(msg)
+	err = createMessage(bot, chatID, "Выбери нужный пункт меню:", keyboard)
 	if err != nil {
 		return err
 	}
@@ -195,15 +207,30 @@ func sendWelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) (err error) {
 		State:          enums.MainMenu,
 		ChoosenWeekday: -1,
 		ChoosenItem:    uuid.Nil,
+		LastMessageId:  -1,
 	})
 }
 
 func showMainMenu(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err error) {
 	defer e.WrapErrIfNotNil(err, "showMainMenu")
 
+	userState, ok, err := service.GetUserState(wCfg.Cache, wCfg.Storage, chatID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось получить состояние пользователя %d", chatID)
+	}
+
 	keyboard := mainMenuKeyboard()
 	text := "Выбери нужный пункт меню:"
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
@@ -213,6 +240,7 @@ func showMainMenu(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err error)
 		State:          enums.MainMenu,
 		ChoosenWeekday: -1,
 		ChoosenItem:    uuid.Nil,
+		LastMessageId:  messageID,
 	})
 }
 
@@ -232,12 +260,12 @@ func showPreviousAction(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err 
 		return showMainMenu(bot, chatID, messageID)
 	case enums.ShowOtherDaySchedule:
 		return showOtherDaySchedule(bot, chatID, messageID)
-	case enums.UpdatingDaySchedule:
+	case enums.UpdateDaySchedule:
 		return showChangeSchedule(bot, chatID, messageID)
-	case enums.DeleteSchedule, enums.UpdatedDaySchedule, enums.UpdateTask:
+	case enums.DeleteSchedule, enums.DayScheduleUpdated, enums.UpdateTask, enums.TaskNotFound:
 		return showDayAction(bot, chatID, messageID, userState.ChoosenWeekday)
 	case enums.DeleteTask, enums.UpdateTaskDescription, enums.UpdateTaskTime, enums.UpdateTaskReminds:
-		return showUpdateTask(bot, chatID, "", userState.ChoosenItem)
+		return showUpdateTask(bot, chatID, "", userState.ChoosenItem, userState)
 	}
 
 	return nil
@@ -245,6 +273,14 @@ func showPreviousAction(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err 
 
 func showCurrentSchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err error) {
 	defer e.WrapErrIfNotNil(err, "showCurrentSchedule")
+
+	userState, ok, err := service.GetUserState(wCfg.Cache, wCfg.Storage, chatID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось получить состояние пользователя %d", chatID)
+	}
 
 	keyboard := infoKeyboard()
 	text, ok, err := service.GetCurrentSchedule(wCfg.Storage, chatID)
@@ -254,10 +290,15 @@ func showCurrentSchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err
 	}
 
 	if !ok {
-		text = "На сегодня нет расписания"
+		text = "На сегодня нет расписания."
 	}
 
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
@@ -267,11 +308,20 @@ func showCurrentSchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err
 		State:          enums.ShowCurrentSchedule,
 		ChoosenWeekday: -1,
 		ChoosenItem:    uuid.Nil,
+		LastMessageId:  messageID,
 	})
 }
 
 func showCurrentTask(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err error) {
 	defer e.WrapErrIfNotNil(err, "showCurrentTask")
+
+	userState, ok, err := service.GetUserState(wCfg.Cache, wCfg.Storage, chatID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось получить состояние пользователя %d", chatID)
+	}
 
 	keyboard := infoKeyboard()
 	tasks, ok, err := service.GetCurrentTasks(wCfg.Storage, chatID)
@@ -284,7 +334,12 @@ func showCurrentTask(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err err
 		text = tasks
 	}
 
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
@@ -294,15 +349,29 @@ func showCurrentTask(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err err
 		State:          enums.ShowCurrentTask,
 		ChoosenWeekday: -1,
 		ChoosenItem:    uuid.Nil,
+		LastMessageId:  messageID,
 	})
 }
 
 func showOtherDaySchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err error) {
 	defer e.WrapErrIfNotNil(err, "showOtherDaySchedule")
 
+	userState, ok, err := service.GetUserState(wCfg.Cache, wCfg.Storage, chatID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось получить состояние пользователя %d", chatID)
+	}
+
 	keyboard := daysOfWeekKeyboard()
 	text := "Выберите день недели:"
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
@@ -312,15 +381,29 @@ func showOtherDaySchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (er
 		State:          enums.ChooseWeekdayGet,
 		ChoosenWeekday: -1,
 		ChoosenItem:    uuid.Nil,
+		LastMessageId:  messageID,
 	})
 }
 
 func showChangeSchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err error) {
 	defer e.WrapErrIfNotNil(err, "showChangeSchedule")
 
+	userState, ok, err := service.GetUserState(wCfg.Cache, wCfg.Storage, chatID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось получить состояние пользователя %d", chatID)
+	}
+
 	keyboard := daysOfWeekKeyboard()
 	text := "Выберите день недели для изменения расписания:"
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
@@ -330,6 +413,7 @@ func showChangeSchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err 
 		State:          enums.ChooseWeekdayUpdate,
 		ChoosenWeekday: -1,
 		ChoosenItem:    uuid.Nil,
+		LastMessageId:  messageID,
 	})
 }
 
@@ -349,12 +433,17 @@ func showDayAction(bot *tgbotapi.BotAPI, chatID int64, messageID int, weekday ti
 		return err
 	}
 	if !ok {
-		schedule = "На выбранный день расписания нет"
+		schedule = "На выбранный день расписания нет."
 	}
 
 	if userState.State == enums.ChooseWeekdayGet {
 		keyboard := infoKeyboard()
-		err = editMessage(bot, chatID, messageID, schedule, keyboard)
+		if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+			err = createMessage(bot, chatID, schedule, keyboard)
+			messageID = -1
+		} else {
+			err = editMessage(bot, chatID, messageID, schedule, keyboard)
+		}
 		if err != nil {
 			return err
 		}
@@ -363,6 +452,7 @@ func showDayAction(bot *tgbotapi.BotAPI, chatID int64, messageID int, weekday ti
 			State:          enums.ShowOtherDaySchedule,
 			ChoosenWeekday: -1,
 			ChoosenItem:    uuid.Nil,
+			LastMessageId:  messageID,
 		})
 	}
 
@@ -374,25 +464,31 @@ func showDayAction(bot *tgbotapi.BotAPI, chatID int64, messageID int, weekday ti
 	13:00-15:21, просмотр кино, [2, 5], {30, 10}
 	--------------------
 
-	[] - за сколько минут нужно предупредить о начале задачи (от 1 до 59)
-	{} - за сколько минут нужно предупредить о конце задачи (от 1 до 59)
+	[] - за сколько минут нужно предупредить о начале задачи (от 1 до 59).
+	{} - за сколько минут нужно предупредить о конце задачи (от 1 до 59).
 	`
 	var text string
 	if ok {
-		text = fmt.Sprintf("%s\n\n%s", schedule, createText)
-	} else {
 		text = fmt.Sprintf("%s\n\n%s\n\n%s", schedule, changeItemText, createText)
+	} else {
+		text = fmt.Sprintf("%s\n\n%s", schedule, createText)
 	}
 	keyboard := changeScheduleKeyboard()
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
 	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, domain.User{
 		ChatID:         chatID,
-		State:          enums.UpdatingDaySchedule,
+		State:          enums.UpdateDaySchedule,
 		ChoosenWeekday: weekday,
 		ChoosenItem:    uuid.Nil,
+		LastMessageId:  messageID,
 	})
 }
 
@@ -413,7 +509,12 @@ func showDeleteSchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err 
 		return err
 	}
 
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
@@ -423,6 +524,7 @@ func showDeleteSchedule(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err 
 		State:          enums.DeleteSchedule,
 		ChoosenWeekday: userState.ChoosenWeekday,
 		ChoosenItem:    uuid.Nil,
+		LastMessageId:  messageID,
 	})
 }
 
@@ -443,12 +545,18 @@ func showDeleteTask(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err erro
 		return err
 	}
 
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
 
 	userState.State = enums.DeleteTask
+	userState.LastMessageId = messageID
 	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, userState)
 }
 
@@ -464,12 +572,18 @@ func showUpdateTaskComment(bot *tgbotapi.BotAPI, chatID int64, messageID int) (e
 	keyboard := infoKeyboard()
 	text := "Введи обновленный комментарий"
 
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
 
 	userState.State = enums.UpdateTaskDescription
+	userState.LastMessageId = messageID
 	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, userState)
 }
 
@@ -484,12 +598,18 @@ func showUpdateTaskTime(bot *tgbotapi.BotAPI, chatID int64, messageID int) (err 
 
 	keyboard := infoKeyboard()
 	text := "Введи обновленное время"
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
 
 	userState.State = enums.UpdateTaskTime
+	userState.LastMessageId = messageID
 	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, userState)
 }
 
@@ -510,25 +630,24 @@ func showUpdateTaskReminds(bot *tgbotapi.BotAPI, chatID int64, messageID int) (e
 	[] - за сколько минут нужно предупредить о начале задачи (от 1 до 59)
 	{} - за сколько минут нужно предупредить о конце задачи (от 1 до 59)
 	`
-	err = editMessage(bot, chatID, messageID, text, keyboard)
+	if userState.LastMessageId != -1 && userState.LastMessageId != messageID {
+		err = createMessage(bot, chatID, text, keyboard)
+		messageID = -1
+	} else {
+		err = editMessage(bot, chatID, messageID, text, keyboard)
+	}
 	if err != nil {
 		return err
 	}
 
 	userState.State = enums.UpdateTaskReminds
+	userState.LastMessageId = messageID
 	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, userState)
 }
 
-func showUpdateTask(bot *tgbotapi.BotAPI, chatID int64, data string, taskId uuid.UUID) (err error) {
-	userState, ok, err := service.GetUserState(wCfg.Cache, wCfg.Storage, chatID)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("не удалось получить состояние пользователя %d", chatID)
-	}
-
+func showUpdateTask(bot *tgbotapi.BotAPI, chatID int64, data string, taskId uuid.UUID, userState domain.User) (err error) {
 	var task domain.Task
+	var ok bool
 
 	if taskId != uuid.Nil {
 		task, ok, err = service.GetTaskById(wCfg.Storage, taskId)
@@ -558,20 +677,17 @@ func showUpdateTask(bot *tgbotapi.BotAPI, chatID int64, data string, taskId uuid
 		if err != nil {
 			return err
 		}
-		taskId = task.Id
-		userState.State = enums.UpdateTask
-		userState.ChoosenItem = taskId
-		return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, userState)
+		return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, domain.User{
+			ChatID:         chatID,
+			State:          enums.UpdateTask,
+			ChoosenWeekday: userState.ChoosenWeekday,
+			ChoosenItem:    task.Id,
+			LastMessageId:  -1,
+		})
 	}
 
 	keyboard := infoKeyboard()
-	msg := tgbotapi.NewMessage(chatID, "Указынный пункт не найден.")
-	msg.ReplyMarkup = keyboard
-	if err != nil {
-		return err
-	}
-
-	_, err = bot.Send(msg)
+	err = createMessage(bot, chatID, "Указынный пункт не найден.", keyboard)
 	if err != nil {
 		return err
 	}
@@ -581,7 +697,7 @@ func showUpdateTask(bot *tgbotapi.BotAPI, chatID int64, data string, taskId uuid
 
 }
 
-func tryCreateSchedule(bot *tgbotapi.BotAPI, chatID int64, data string) (err error) {
+func CreateSchedule(bot *tgbotapi.BotAPI, chatID int64, data string, userState domain.User) (err error) {
 	userState, ok, err := service.GetUserState(wCfg.Cache, wCfg.Storage, chatID)
 	if err != nil {
 		return
@@ -589,7 +705,7 @@ func tryCreateSchedule(bot *tgbotapi.BotAPI, chatID int64, data string) (err err
 	if !ok {
 		return fmt.Errorf("не удалось получить состояние пользователя %d", chatID)
 	}
-	if userState.State != enums.UpdatingDaySchedule {
+	if userState.State != enums.UpdateDaySchedule {
 		return
 	}
 
@@ -599,20 +715,92 @@ func tryCreateSchedule(bot *tgbotapi.BotAPI, chatID int64, data string) (err err
 	}
 
 	keyboard := infoKeyboard()
-	msg := tgbotapi.NewMessage(chatID, "Расписание обновлено.")
-	msg.ReplyMarkup = keyboard
-
-	_, err = bot.Send(msg)
+	err = createMessage(bot, chatID, "Расписание обновлено.", keyboard)
 	if err != nil {
 		return err
 	}
 
-	userState.State = enums.UpdatedDaySchedule
-	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, userState)
+	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, domain.User{
+		ChatID:         chatID,
+		State:          enums.DayScheduleUpdated,
+		ChoosenWeekday: userState.ChoosenWeekday,
+		ChoosenItem:    userState.ChoosenItem,
+		LastMessageId:  -1,
+	})
+}
 
+func UpdateTaskDescription(bot *tgbotapi.BotAPI, chatID int64, data string, userState domain.User) (err error) {
+	err = service.UpdateTaskDescriptionById(wCfg.Storage, userState.ChoosenItem, data)
+	if err != nil {
+		return err
+	}
+
+	keyboard := infoKeyboard()
+	err = createMessage(bot, chatID, "Описание обновлено.", keyboard)
+	if err != nil {
+		return err
+	}
+
+	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, domain.User{
+		ChatID:         chatID,
+		State:          enums.DayScheduleUpdated,
+		ChoosenWeekday: userState.ChoosenWeekday,
+		ChoosenItem:    userState.ChoosenItem,
+		LastMessageId:  -1,
+	})
+}
+
+func UpdateTaskTime(bot *tgbotapi.BotAPI, chatID int64, data string, userState domain.User) (err error) {
+	err = service.UpdateTaskTimeById(wCfg.Storage, userState.ChoosenItem, data)
+	if err != nil {
+		return err
+	}
+
+	keyboard := infoKeyboard()
+	err = createMessage(bot, chatID, "Время обновлено.", keyboard)
+	if err != nil {
+		return err
+	}
+
+	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, domain.User{
+		ChatID:         chatID,
+		State:          enums.DayScheduleUpdated,
+		ChoosenWeekday: userState.ChoosenWeekday,
+		ChoosenItem:    userState.ChoosenItem,
+		LastMessageId:  -1,
+	})
+}
+
+func UpdateTaskReminds(bot *tgbotapi.BotAPI, chatID int64, data string, userState domain.User) (err error) {
+	err = service.UpdateTaskRemindsById(wCfg.Storage, userState.ChoosenItem, data)
+	if err != nil {
+		return err
+	}
+
+	keyboard := infoKeyboard()
+	err = createMessage(bot, chatID, "Напоминания обновлены.", keyboard)
+	if err != nil {
+		return err
+	}
+
+	return service.SetUserState(wCfg.Cache, wCfg.Storage, chatID, domain.User{
+		ChatID:         chatID,
+		State:          enums.DayScheduleUpdated,
+		ChoosenWeekday: userState.ChoosenWeekday,
+		ChoosenItem:    userState.ChoosenItem,
+		LastMessageId:  -1,
+	})
 }
 
 // EDIT MESSAGE
+
+func createMessage(bot *tgbotapi.BotAPI, chatID int64, newText string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	msg := tgbotapi.NewMessage(chatID, newText)
+	msg.ReplyMarkup = keyboard
+
+	_, err := bot.Send(msg)
+	return err
+}
 
 func editMessage(bot *tgbotapi.BotAPI, chatID int64, messageID int, newText string, newMarkup tgbotapi.InlineKeyboardMarkup) error {
 	err := editMessageText(bot, chatID, messageID, newText)
@@ -639,19 +827,19 @@ func editMessageText(bot *tgbotapi.BotAPI, chatID int64, messageID int, newText 
 
 func parseActionDay(action string) time.Weekday {
 	switch action {
-	case "action_monday":
+	case "action_day_monday":
 		return time.Monday
-	case "action_tuesday":
+	case "action_day_tuesday":
 		return time.Tuesday
-	case "action_wednesday":
+	case "action_day_wednesday":
 		return time.Wednesday
-	case "action_thursday":
+	case "action_day_thursday":
 		return time.Thursday
-	case "action_friday":
+	case "action_day_friday":
 		return time.Friday
-	case "action_saturday":
+	case "action_day_saturday":
 		return time.Saturday
-	case "action_sunday":
+	case "action_day_sunday":
 		return time.Sunday
 	}
 	return -1

@@ -50,7 +50,7 @@ func (s *TempStorageContext) GetTaskByPosition(pos int, day time.Weekday, chatID
 		}
 	}
 
-	if len(result) <= pos {
+	if len(result) < pos {
 		return domain.Task{}, false, nil
 	}
 

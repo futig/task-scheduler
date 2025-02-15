@@ -13,7 +13,9 @@ import (
 	"github.com/google/uuid"
 )
 
-var taskRegex = regexp.MustCompile(`^\d{1,2}:\d{2}-\d{1,2}:\d{2},\s+[^,]+,\s+\[\s*(?:[1-5]?\d\s*,\s*)*[1-5]?\d\s*\],\s+\{\s*(?:[1-5]?\d\s*,\s*)*[1-5]?\d\s*\}$`)
+var taskRegex = regexp.MustCompile(`^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2}),\s+([^,]+),\s+\[(\s*(?:[1-5]?\d\s*,\s*)*[1-5]?\d\s*)\],\s+\{(\s*(?:[1-5]?\d\s*,\s*)*[1-5]?\d\s*)\}$`)
+var taskTimeRegex = regexp.MustCompile(`^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$`)
+var taskRemindsRegex = regexp.MustCompile(`^\[(\s*(?:[1-5]?\d\s*,\s*)*[1-5]?\d\s*)?\],\s*\{(\s*(?:[1-5]?\d\s*,\s*)*[1-5]?\d\s*)?\}$`)
 
 func GetCurrentSchedule(storage storage.Storage, chatID int64) (string, bool, error) {
 	return GetScheduleByWeekday(storage, chatID, time.Now().Local().Weekday())
@@ -24,9 +26,12 @@ func GetScheduleByWeekday(storage storage.Storage, chatID int64, weekday time.We
 	if err != nil {
 		return "", false, err
 	}
+	if len(tasks) == 0 {
+		return "", false, nil
+	}
 	res := make([]string, 0, len(tasks))
-	for _, val := range tasks {
-		res = append(res, val.String())
+	for i, val := range tasks {
+		res = append(res, fmt.Sprintf("%d) %s", i+1, val.String()))
 	}
 	schedule := strings.Join(res, "\n")
 	return schedule, true, nil
@@ -37,9 +42,12 @@ func GetCurrentTasks(storage storage.Storage, chatID int64) (string, bool, error
 	if err != nil {
 		return "", false, err
 	}
+	if len(tasks) == 0 {
+		return "", false, nil
+	}
 	res := make([]string, 0, len(tasks))
-	for _, val := range tasks {
-		res = append(res, val.String())
+	for i, val := range tasks {
+		res = append(res, fmt.Sprintf("%d) %s", i+1, val.String()))
 	}
 	schedule := strings.Join(res, "\n")
 	return schedule, true, nil
@@ -50,8 +58,7 @@ func GetTaskById(storage storage.Storage, id uuid.UUID) (domain.Task, bool, erro
 }
 
 func GetTaskByPosition(storage storage.Storage, id int, chatID int64, weekday time.Weekday) (domain.Task, bool, error) {
-	return storage.GetTaskByPosition(id, weekday, chatID)
-
+	return storage.GetTaskByPosition(id-1, weekday, chatID)
 }
 
 func CreateSchedule(storage storage.Storage, chatID int64, weekday time.Weekday, data string) error {
@@ -96,7 +103,6 @@ func CreateSchedule(storage storage.Storage, chatID int64, weekday time.Weekday,
 		return err
 	}
 	return storage.CreateReminds(reminders)
-
 }
 
 func parseReminders(remindStr string, taskID uuid.UUID, remindType enums.RemindType, reminders *[]domain.Remind, baseTime int) {
@@ -127,6 +133,71 @@ func parseReminders(remindStr string, taskID uuid.UUID, remindType enums.RemindT
 			Time:   remindTime,
 		})
 	}
+}
+
+func UpdateTaskDescriptionById(storage storage.Storage, id uuid.UUID, data string) error {
+	task, ok, err := storage.GetTaskById(id)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось найти задачу с таким id %s", id.String())
+	}
+
+	task.Comment = data
+	return storage.UpdateTaskById(id, task)
+}
+
+func UpdateTaskTimeById(storage storage.Storage, id uuid.UUID, data string) error {
+	matches := taskTimeRegex.FindStringSubmatch(data)
+	if matches == nil {
+		return fmt.Errorf("invalid task format")
+	}
+
+	startHour, _ := strconv.Atoi(matches[1])
+	startMin, _ := strconv.Atoi(matches[2])
+	endHour, _ := strconv.Atoi(matches[3])
+	endMin, _ := strconv.Atoi(matches[4])
+
+	startMinutes := startHour*60 + startMin
+	endMinutes := endHour*60 + endMin
+
+	task, ok, err := storage.GetTaskById(id)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось найти задачу с таким id %s", id.String())
+	}
+
+	task.Start = startMinutes
+	task.End = endMinutes
+	return storage.UpdateTaskById(id, task)
+}
+
+func UpdateTaskRemindsById(storage storage.Storage, id uuid.UUID, data string) error {
+	matches := taskRemindsRegex.FindStringSubmatch(data)
+	if matches == nil {
+		return fmt.Errorf("invalid task format")
+	}
+	reminders := []domain.Remind{}
+
+	task, ok, err := storage.GetTaskById(id)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("не удалось найти задачу с таким id %s", id.String())
+	}
+
+	parseReminders(matches[1], id, enums.Start, &reminders, task.Start)
+	parseReminders(matches[2], id, enums.End, &reminders, task.End)
+
+	err = storage.DeleteRemindsByTaskId(id)
+	if err != nil {
+		return err
+	}
+	return storage.CreateReminds(reminders)
 }
 
 func DeleteSchedule(storage storage.Storage, chatID int64, weekday time.Weekday) error {

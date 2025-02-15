@@ -4,12 +4,12 @@ type UserState int
 
 const (
 	MainMenu UserState = iota
-	
+
 	ChooseWeekdayGet
 	ChooseWeekdayUpdate
 
-	UpdatingDaySchedule
-	UpdatedDaySchedule
+	UpdateDaySchedule
+	DayScheduleUpdated
 
 	UpdateTask
 	UpdateTaskDescription

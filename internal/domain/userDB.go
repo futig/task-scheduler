@@ -12,4 +12,5 @@ type User struct {
 	State          enums.UserState
 	ChoosenWeekday time.Weekday
 	ChoosenItem    uuid.UUID
+	LastMessageId  int
 }
