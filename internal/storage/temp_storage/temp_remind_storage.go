@@ -51,10 +51,10 @@ func (s *TempStorageContext) GetRemindsForPeriod(period int) ([]domain.TaskRemin
 		remind := remVal.(domain.Remind)
 		curTime := t.CurrentTimeToMinutes()
 		diff := remind.Time - curTime
-		if diff < 0 && period <= diff {
+		if diff < 0 || period <= diff {
 			continue
 		}
-		if taskVal, ok := s.Reminds.Load(remind.TaskId); ok {
+		if taskVal, ok := s.Tasks.Load(remind.TaskId); ok {
 			task := taskVal.(domain.Task)
 			taskRem := domain.TaskRemind{
 				ChatId:  task.ChatId,

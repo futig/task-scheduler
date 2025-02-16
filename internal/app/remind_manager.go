@@ -27,6 +27,7 @@ func reminderManager(ctx context.Context, wg *sync.WaitGroup) {
 			for _, task := range tasks {
 				wCfg.RemindsCh <- task
 			}
+			timerCh = time.After(cfg.RemindsCheckInterval)
 		}
 	}
 }

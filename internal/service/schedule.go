@@ -97,6 +97,18 @@ func CreateSchedule(storage storage.Storage, chatID int64, weekday time.Weekday,
 
 		parseReminders(matches[6], task.Id, enums.Start, &reminders, startMinutes)
 		parseReminders(matches[7], task.Id, enums.End, &reminders, endMinutes)
+		reminders = append(reminders, domain.Remind{
+			Id:     uuid.New(),
+			TaskId: task.Id,
+			Type:   enums.Start,
+			Time:   startMinutes,
+		})
+		reminders = append(reminders, domain.Remind{
+			Id:     uuid.New(),
+			TaskId: task.Id,
+			Type:   enums.End,
+			Time:   endMinutes,
+		})
 	}
 	err := storage.CreateTasks(tasks)
 	if err != nil {
