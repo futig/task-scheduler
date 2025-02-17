@@ -48,7 +48,7 @@ Task Scheduler - это телеграм бот для управления ра
 
    Пример файла `.env`:
    ```bash
-   TELEGRAM_BOT_TOKEN=123456:ABC-DEF
+   BOT_TOKEN=123456:ABC-DEF
    MIN_WORKERS=1
    MAX_WORKERS=12
    BUSY_THRESHOLD=50
