@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -73,7 +72,7 @@ func initEnvVariables() {
 	if !variablesInited {
 		err := godotenv.Load()
 		if err != nil {
-			log.Fatal(".env file not found or can't be loaded")
+			log.Printf(".env file not found or can't be loaded")
 		}
 		variablesInited = true
 	}
@@ -82,12 +81,12 @@ func initEnvVariables() {
 func getIntVar(key string) int {
 	rawVal := os.Getenv(key)
 	if rawVal == "" {
-		log.Fatal(fmt.Sprintf("variable %s is not specified", key))
+		log.Fatalf("variable %s is not specified", key)
 	}
 
 	val, err := strconv.Atoi(rawVal)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("variable %s must be integer", key))
+		log.Fatalf("variable %s must be integer", key)
 	}
 
 	return val
