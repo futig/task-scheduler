@@ -1,0 +1,31 @@
+README.md
+
+# Исключить файлы конфигурации IDE
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Исключить временные файлы
+*.log
+*.tmp
+*.temp
+*.swp
+*.sln.ide
+
+# Исключить файлы Git
+.git
+.gitignore
+.gitattributes
+
+# Исключить конфигурационные файлы операционных систем
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Исключить секреты и ключи (если есть)
+*.key
+*.pfx
+*.p12
